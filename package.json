@@ -1,0 +1,33 @@
+{
+  "name": "cryptochain",
+  "version": "1.0.0",
+  "description": "En fullständig blockkedjeimplementation för en egen kryptovaluta med transaktionshantering och validering. Systemet inkluderar en transaktionspool, nätverkssynkronisering mellan noder, MongoDB-lagring, och JWT-autentisering. Projektet består av både en backend-implementation med REST API och en frontend-klient för att interagera med blockkedjan.",
+  "main": "backend/src/server.mjs",
+  "scripts": {
+    "test": "vitest",
+    "start": "NODE_ENV=production node backend/src/server.mjs",
+    "dev-node": "cross-env GENERATE_NODE_PORT='true' nodemon src/server.mjs",
+    "dev": "nodemon backend/src/server.mjs"
+  },
+  "keywords": [],
+  "author": "Jihi Glete",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.1",
+    "vitest": "^3.2.3"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "elliptic": "^6.6.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.17.0",
+    "mongoose": "^8.15.2",
+    "uuid": "^11.1.0",
+    "validator": "^13.15.15",
+    "ws": "^8.18.2"
+  }
+}
