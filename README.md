@@ -138,5 +138,3 @@ POST /api/v1/blocks/mining
 ## Felsökningstips
 - Om du får 401 Unauthorized: Kontrollera att du skickar JWT-token i Authorization-headern.
 
----
-
