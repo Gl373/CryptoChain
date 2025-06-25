@@ -5,12 +5,12 @@ import { User } from '../models/User.mjs';
 import jwt from 'jsonwebtoken';
 import { jwtConfig } from '../../config/jwt.mjs';
 import AppError from '../utilities/AppError.mjs';
-import Wallet from '../models/Wallet.mjs';
+import { wallet } from '../walletInstance.mjs';
+
 
 export const register = asyncCatch(async (req, res, next) => {
   console.log('REGISTER BODY:', req.body);
   const { username, password } = req.body;
-  const wallet = new Wallet();
   const user = await User.create({ username, password, publicKey: wallet.publicKey });
   console.log('USER CREATED:', user);
   res.status(201).json({ success: true, data: { username, role: user.role, publicKey: user.publicKey } });

@@ -1,18 +1,28 @@
-import dotenv from 'dotenv';
 import app from './app.mjs';
-import { setupWebSocket } from './websocket.mjs';
 import { connectDB } from '../config/db.mjs';
+import Blockchain from './models/Blockchain.mjs';
+import { wallet } from './walletInstance.mjs';
+import TransactionPool from './models/TransactionPool.mjs';
+import Network from './network.mjs';
 
-const PORT = process.env.PORT || 3010;
-const PEERS = process.env.PEERS ? process.env.PEERS.split(',') : [];
+export const blockchain = new Blockchain();
+export const transactionPool = new TransactionPool();
+export const network = new Network({ blockchain, transactionPool, wallet });
 
-dotenv.config();
+const main = async () => {
+  await connectDB();
+  
+  await blockchain.loadFromDB();
+  await transactionPool.loadFromDB();
 
-connectDB().then(() => {
+  network.listen();   
+  const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(
-      `Servern är startad på adress http://localhost:${PORT} och kör i läget ${process.env.NODE_ENV}`
-    );
-    setupWebSocket(Number(PORT) + 1, PEERS);
+    console.log(`Server running on port ${PORT}`);
   });
-});
+};
+
+if (process.env.NODE_ENV === 'test') {
+}
+
+main();

@@ -10,6 +10,11 @@ const blockchainSchema = new mongoose.Schema({
 
 export const BlockchainModel = mongoose.model('Blockchain', blockchainSchema);
 
+function cleanBlock(block) {
+  const { id, timestamp, lastHash, hash, data, nonce, difficulty } = block;
+  return { id, timestamp, lastHash, hash, data, nonce, difficulty };
+}
+
 export class Blockchain {
   constructor() {
     this.chain = [Block.genesis()];
@@ -23,16 +28,24 @@ export class Blockchain {
   }
 
   async mineBlock({ transactions, minerWallet }) {
-    const rewardTransaction = Transaction.reward({ miner: minerWallet });
+    const rewardTransaction = Transaction.reward({ minerWallet });
     const blockTransactions = [rewardTransaction, ...transactions];
     const newBlock = await this.addBlock(blockTransactions);
     return newBlock;
   }
 
   async saveToDB() {
+    const savePromises = this.chain.map(block => {
+      return BlockModel.findOneAndUpdate(
+        { id: block.id },
+        cleanBlock(block),
+        { upsert: true, new: true }
+      );
+    });
+    const savedBlocks = await Promise.all(savePromises);
     await BlockchainModel.findOneAndUpdate(
       {},
-      { chain: this.chain.map(block => block.id) },
+      { chain: savedBlocks.map(block => block._id) },
       { upsert: true }
     );
   }
@@ -40,25 +53,44 @@ export class Blockchain {
   async loadFromDB() {
     const blockchainDoc = await BlockchainModel.findOne().populate('chain');
     if (blockchainDoc && blockchainDoc.chain.length > 0) {
-      this.chain = blockchainDoc.chain;
-      if (!this.validateChain(this.chain) || !this.validateTransactionData(this.chain)) {
-        throw new Error('Loaded chain is invalid');
+      this.chain = blockchainDoc.chain.map(block => {
+        return {
+          id: block.id,
+          timestamp: block.timestamp,
+          lastHash: block.lastHash,
+          hash: block.hash,
+          data: block.data,
+          nonce: block.nonce,
+          difficulty: block.difficulty
+        };
+      });
+      if (!Blockchain.validateChain(this.chain) || !this.validateTransactionData(this.chain)) {
+        console.error('Loaded chain is invalid, resetting to genesis');
+        this.chain = [Block.genesis()];
+        await this.saveToDB();
       }
     }
   }
 
   static validateChain(chain) {
-    if (JSON.stringify(chain[0]) !== JSON.stringify(Block.genesis())) {
-      throw new Error('Invalid genesis block');
+    const clean = block => {
+      const { timestamp, lastHash, hash, data, nonce, difficulty } = block;
+      return { timestamp, lastHash, hash, data, nonce, difficulty };
+    };
+    if (JSON.stringify(clean(chain[0])) !== JSON.stringify(clean(Block.genesis()))) {
+      console.error('Genesis block mismatch');
+      return false;
     }
     for (let i = 1; i < chain.length; i++) {
       const block = chain[i];
       const previousBlock = chain[i - 1];
       if (block.lastHash !== previousBlock.hash) {
-        throw new Error('Invalid lastHash');
+        console.error('Invalid lastHash at block', i);
+        return false;
       }
       if (Block.blockHash(block) !== block.hash) {
-        throw new Error('Invalid block hash');
+        console.error('Invalid block hash at block', i);
+        return false;
       }
     }
     return true;
@@ -75,24 +107,29 @@ export class Blockchain {
         if (transaction.input.address === REWARD_ADDRESS.address) {
           rewardCount++;
           if (rewardCount > 1) {
-            throw new Error('Too many reward transactions in block');
+            console.error('Too many reward transactions in block', i);
+            return false;
           }
           if (transaction.outputMap[Object.keys(transaction.outputMap)[0]] !== MINING_REWARD) {
-            throw new Error('Invalid reward amount');
+            console.error('Invalid reward amount in block', i);
+            return false;
           }
         } else {
           if (!Transaction.validate(transaction)) {
-            throw new Error('Invalid transaction outputMap or signature');
+            console.error('Invalid transaction in block', i);
+            return false;
           }
           const outputTotal = Object.values(transaction.outputMap).reduce((sum, amt) => sum + amt, 0);
           if (transaction.input.amount !== outputTotal) {
-            throw new Error('Invalid transaction balance');
+            console.error('Invalid transaction balance in block', i);
+            return false;
           }
           blockBalance += transaction.input.amount;
         }
         const transactionId = transaction.id;
         if (transactionSet.has(transactionId)) {
-          throw new Error('Duplicate transaction in block');
+          console.error('Duplicate transaction in block', i);
+          return false;
         }
         transactionSet.add(transactionId);
       }
@@ -101,15 +138,17 @@ export class Blockchain {
   }
 
   async replaceChain(chain, shouldValidate = true) {
+    console.log('replaceChain called with chain:', JSON.stringify(chain, null, 2));
     if (chain.length <= this.chain.length) {
-      throw new Error('Incoming chain is not longer');
+      console.log('Block 1 på denna nod:', JSON.stringify(chain[1], null, 2));
+      console.log('Incoming chain is not longer than the current chain. Not replacing.');
+      return;
     }
-    if (!Blockchain.validateChain(chain)) {
-      throw new Error('Invalid chain structure');
+    if (shouldValidate && (!Blockchain.validateChain(chain) || !this.validateTransactionData(chain))) {
+      console.error('Incoming chain is invalid or has invalid transaction data. Not replacing.');
+      return;
     }
-    if (shouldValidate && !this.validateTransactionData(chain)) {
-      throw new Error('Invalid transaction data in chain');
-    }
+    console.log('Replacing the current chain with the new chain.');
     this.chain = chain;
     await this.saveToDB();
   }

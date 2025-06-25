@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { INITIAL_DIFFICULTY } from '../utilities/constants.mjs';
+import { INITIAL_DIFFICULTY, MINE_RATE } from '../utilities/constants.mjs';
 import { createHash, stableStringify } from '../utilities/hash.mjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -28,15 +28,15 @@ export class Block {
   }
 
   static genesis() {
-    return new Block({
-      id: uuidv4(),
-      timestamp: Date.now(),
-      lastHash: 'genesis_hash',
-      hash: 'genesis_hash',
+    return {
+      id: 'genesis-id',
+      timestamp: 1,
+      lastHash: '-----',
+      hash: 'genesis-hash',
       data: [],
       nonce: 0,
-      difficulty: INITIAL_DIFFICULTY,
-    });
+      difficulty: 3
+    };
   }
 
   static async createBlock({ previousBlock, data }) {
@@ -44,9 +44,12 @@ export class Block {
     const lastHash = previousBlock.hash;
     const id = uuidv4();
     const { nonce, difficulty, hash } = await Block.mineBlock({ previousBlock, data });
-    const block = new Block({ id, timestamp, lastHash, hash, data, nonce, difficulty });
-    await BlockModel.create(block);
-    return block;
+
+    const newBlockInstance = new Block({ id, timestamp, lastHash, hash, data, nonce, difficulty });
+    
+    const savedBlockDocument = await BlockModel.create(newBlockInstance);
+    newBlockInstance._id = savedBlockDocument._id;
+    return newBlockInstance;
   }
 
   static async mineBlock({ previousBlock, data }) {
@@ -55,7 +58,7 @@ export class Block {
       nonce++;
       timestamp = Date.now();
       difficulty = Block.adjustDifficulty({ block: previousBlock, timestamp });
-      hash = createHash(timestamp, previousBlock.hash, data, nonce, difficulty);
+      hash = createHash(timestamp, previousBlock.hash, stableStringify(data), nonce, difficulty);
     } while (hash.substring(0, difficulty) !== '0'.repeat(difficulty));
     return { nonce, difficulty, hash };
   }

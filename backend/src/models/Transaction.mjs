@@ -49,35 +49,24 @@ export default class Transaction {
     } = transaction;
 
     const outputTotal = Object.values(outputMap).reduce((sum, amt) => sum + amt, 0);
-
-    console.log('--- VALIDATION DEBUG ---');
-    console.log('Input Amount:', amount);
-    console.log('Output Total:', outputTotal);
     
     if (amount !== outputTotal) {
-      console.log('Validation failed: Input amount does not match output total.');
       return false;
     }
 
     const key = ec.keyFromPublic(address, 'hex');
-    const isSignatureValid = key.verify(createHash(stableStringify(outputMap)), signature);
-
-    if (!isSignatureValid) {
-      console.log('Validation failed: Invalid signature.');
-    }
-    console.log('------------------------');
-
-    return isSignatureValid;
+    return key.verify(createHash(stableStringify(outputMap)), signature);
   }
 
-  static reward({ miner }) {
-    const transaction = new Transaction({ sender: null, recipient: null, amount: 0 });
-    transaction.outputMap = { [miner.publicKey]: MINING_REWARD };
+  static reward({ minerWallet }) {
+    const transaction = Object.create(this.prototype);
+    transaction.id = uuidv4().replace(/-/g, '');
+    transaction.outputMap = { [minerWallet.publicKey]: MINING_REWARD };
     transaction.input = {
       timestamp: Date.now(),
       amount: MINING_REWARD,
       address: REWARD_ADDRESS.address,
-      signature: 'reward-signature',
+      signature: 'reward-signature'
     };
     return transaction;
   }

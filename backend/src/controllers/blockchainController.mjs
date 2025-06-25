@@ -2,8 +2,8 @@ import Blockchain from '../models/Blockchain.mjs';
 import { asyncCatch } from '../middleware/asyncCatch.mjs';
 import AppError from '../utilities/AppError.mjs';
 import Transaction from '../models/Transaction.mjs';
-import { blockchain, transactionPool, wallet } from '../state.mjs';
-
+import { blockchain, network, transactionPool } from '../server.mjs';
+import { wallet } from '../walletInstance.mjs';
 
 export const listAllBlocks = asyncCatch(async (req, res) => {
   res.status(200).json({
@@ -38,18 +38,20 @@ export const findBlock = asyncCatch(async (req, res) => {
 });
 
 export const miningBlock = asyncCatch(async (req, res, next) => {
+  console.log('Block 1 efter mining:', JSON.stringify(blockchain.chain[1], null, 2));
   if (transactionPool && Object.keys(transactionPool.transactionMap).length === 0) {
     return next(new AppError('Inga transaktioner att minera', 400));
   }
-  
+
   const validTransactions = Object.values(transactionPool.transactionMap);
-  
+
   const block = await blockchain.mineBlock({
     transactions: validTransactions,
     minerWallet: wallet
   });
-  
+
   transactionPool.clear();
+  network.syncChains();
 
   res.status(201).json({ success: true, data: block });
 });

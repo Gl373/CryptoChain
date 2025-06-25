@@ -1,5 +1,6 @@
 import { asyncCatch } from '../middleware/asyncCatch.mjs';
-import { blockchain, transactionPool, wallet } from '../state.mjs';
+import { network, transactionPool } from '../server.mjs';
+import { wallet } from '../walletInstance.mjs';
 import Transaction from '../models/Transaction.mjs';
 import AppError from '../utilities/AppError.mjs';
 
@@ -8,15 +9,27 @@ export const addTransaction = asyncCatch(async (req, res, next) => {
   if (!amount || !recipient) {
     return next(new AppError('Belopp och mottagare krävs', 400));
   }
+
   let transaction = transactionPool.transactionExists({ address: wallet.publicKey });
-  if (transaction) {
-    transaction.update({ sender: wallet, recipient, amount });
-    transactionPool.addTransaction(transaction);
-  } else {
-    transaction = wallet.createTransaction({ recipient, amount, chain: blockchain.chain });
-    transactionPool.addTransaction(transaction);
+  
+  try {
+    if (transaction) {
+      transaction.update({ sender: wallet, recipient, amount });
+    } else {
+      transaction = wallet.createTransaction({ recipient, amount, chain: network.blockchain.chain });
+    }
+    
+    // Lägg till transaktionen och sänd bara om den inte redan finns
+    if (!transactionPool.transactionExists({ address: wallet.publicKey, id: transaction.id })) {
+      transactionPool.addTransaction(transaction);
+      network.broadcastTransaction(transaction);
+    }
+    
+    res.status(201).json({ success: true, data: transaction });
+
+  } catch (error) {
+    return next(new AppError(error.message, 400));
   }
-  res.status(201).json({ success: true, data: transaction });
 });
 
 export const listAllTransactions = asyncCatch(async (req, res, next) => {

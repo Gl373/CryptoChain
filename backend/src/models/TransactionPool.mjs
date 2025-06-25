@@ -47,15 +47,12 @@ export default class TransactionPool {
   }
 
   async saveToDB() {
-    // Get an array of transaction objects from the map
     const transactionsToSave = Object.values(this.transactionMap);
     if (transactionsToSave.length === 0) {
-      // If the pool is empty, ensure the DB is also empty
       await TransactionPoolModel.findOneAndUpdate({}, { transactions: [] }, { upsert: true });
       return;
     }
 
-    // Use bulkWrite to efficiently upsert all transactions.
     const operations = transactionsToSave.map(tx => ({
       updateOne: {
         filter: { id: tx.id },
@@ -66,12 +63,10 @@ export default class TransactionPool {
 
     await TransactionModel.bulkWrite(operations);
 
-    // Get the MongoDB ObjectIds for all transactions that are in our current pool
     const transactionIds = transactionsToSave.map(tx => tx.id);
     const dbTransactions = await TransactionModel.find({ id: { $in: transactionIds } }).select('_id');
     const transactionObjectIds = dbTransactions.map(t => t._id);
     
-    // Finally, update the single transaction pool document
     await TransactionPoolModel.findOneAndUpdate(
       {},
       { transactions: transactionObjectIds },

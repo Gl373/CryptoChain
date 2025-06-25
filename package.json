@@ -4,15 +4,19 @@
   "description": "En fullständig blockkedjeimplementation för en egen kryptovaluta med transaktionshantering och validering. Systemet inkluderar en transaktionspool, nätverkssynkronisering mellan noder, MongoDB-lagring, och JWT-autentisering. Projektet består av både en backend-implementation med REST API och en frontend-klient för att interagera med blockkedjan.",
   "main": "backend/src/server.mjs",
   "scripts": {
-    "test": "vitest",
-    "start": "NODE_ENV=production node backend/src/server.mjs",
-    "dev-node": "cross-env GENERATE_NODE_PORT='true' nodemon src/server.mjs",
-    "dev": "nodemon backend/src/server.mjs"
+    "dev": "cross-env nodemon backend/src/server.mjs",
+    "start": "node backend/src/server.mjs",
+    "test": "vitest --run",
+    "clear-db": "node backend/src/utilities/clear-db.mjs"
   },
-  "keywords": [],
+  "keywords": [
+    "blockchain"
+  ],
   "author": "Jihi Glete",
   "license": "ISC",
   "devDependencies": {
+    "cross-env": "^7.0.3",
+    "mongodb-memory-server": "^10.1.4",
     "nodemon": "^3.1.10",
     "supertest": "^7.1.1",
     "vitest": "^3.2.3"
